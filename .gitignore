@@ -7,4 +7,5 @@
 
 # Allowed Extensions
 !**/*.cs
+!**/*.asmdef
 !.gitignore

@@ -1,0 +1,29 @@
+{
+    "name": "Runtime",
+    "rootNamespace": "Core",
+    "references": [
+        "GUID:457756d89b35d2941b3e7b37b4ece6f1",
+        "GUID:75469ad4d38634e559750d17036d5f7c",
+        "GUID:9e24947de15b9834991c9d8411ea37cf",
+        "GUID:84651a3751eca9349aac36a66bba901b",
+        "GUID:a06fd6991db310342b1d7d14dc58e8f6",
+        "GUID:547fd4947f142c94faf48061ee4d9c27",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f",
+        "GUID:df380645f10b7bc4b97d4f5eb6303d95",
+        "GUID:4bdfb2239705740718731d0b4d54061d",
+        "GUID:eec0964c48f6f4e40bc3ec2257ccf8c5",
+        "GUID:2ea5809997b1bc840ae4b75b22a22329"
+    ],
+    "includePlatforms": [
+        "Editor",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

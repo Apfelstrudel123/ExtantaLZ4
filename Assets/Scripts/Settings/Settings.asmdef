@@ -1,0 +1,24 @@
+{
+    "name": "Settings",
+    "rootNamespace": "Settings",
+    "references": [
+        "Unity.TextMeshPro",
+        "Unity.RenderPipelines.HighDefinition.Runtime",
+        "Unity.InputSystem",
+        "Unity.Localization",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
+    ],
+    "includePlatforms": [
+        "Editor",
+        "WindowsStandalone64"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
