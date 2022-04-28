@@ -1,0 +1,10 @@
+# ignore all files that have an extension
+**/*.*
+
+#Ignore all subdir except assets
+/*
+!/Assets
+
+# Allowed Extensions
+!**/*.cs
+!.gitignore
