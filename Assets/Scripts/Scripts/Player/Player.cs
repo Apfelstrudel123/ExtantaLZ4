@@ -20,13 +20,20 @@ namespace Gameplay
 	//
 	// Enum State
 	//
-	public enum ControlType
+	public enum PlayerState
 	{
-		Interact = 0,
-		SecInteract = 1,
-		Parkour = 2,
-		Individual = 3,
+		Stand,
+		Run,
+		Crouch,
+		Prone,
+		Fall,
+		Vault,
+		Ladder,
+		HorseStand,
+		HorseRunn,
+		HorseFall
 	}
+
 	public enum PlayerDetectionType
 	{
 		PickUp,
