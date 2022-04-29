@@ -13,6 +13,13 @@ using Gameplay.Combat;
 
 namespace Gameplay
 { 
+	//// PLAYER STATE CONCEPT
+	//
+	// StateData Scriptable Object
+	//		Attribute: Behaviour
+	//
+	// Enum State
+	//
 	public enum ControlType
 	{
 		Interact = 0,
