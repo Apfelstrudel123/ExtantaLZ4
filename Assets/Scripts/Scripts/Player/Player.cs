@@ -14,6 +14,20 @@ using Gameplay.Interaction;
 
 namespace Gameplay
 { 
+	//// PLAYER STATE CONCEPT
+	//
+	// StateData Scriptable Object
+	//		Attribute: Behaviour
+	//
+	// Enum State
+	//
+	public enum ControlType
+	{
+		Interact = 0,
+		SecInteract = 1,
+		Parkour = 2,
+		Individual = 3,
+	}
 	public enum PlayerDetectionType
 	{
 		PickUp
