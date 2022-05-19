@@ -9,121 +9,126 @@ namespace Gameplay
     public class Cam : MonoBehaviour
     {
         public static Cam active;
-        [HideInInspector] public Camera cam;
-        [HideInInspector] public HDAdditionalCameraData camData;
+		public static Transform Transform { get; private set; }
+        public static Camera Camera { get; private set; }
+		public static HDAdditionalCameraData CamData { get; private set; }
 
-        [SerializeField] private Vector3 startPosition;
-        [SerializeField] private Quaternion startRotation;
+		[SerializeField] private InputAction mouseMovement;
+		[SerializeField] private float upwardPitchAngle = -90.0f;
+		[SerializeField] private float downwardPitchAngle = 90.0f;
 
         private void Awake()
         {
             active = this;
-            cam = GetComponent<Camera>();
-            camData = GetComponent<HDAdditionalCameraData>();
+			Transform = transform;
+            Camera = GetComponent<Camera>();
+            CamData = GetComponent<HDAdditionalCameraData>();
         }
 
         public void Init()
         {
             
         }
-
-        public void SetLoadingScreenPosition()
-        {
-            transform.SetPositionAndRotation(startPosition, startRotation);
-        }
-
-        public void UpdateSettings()
-        {
-            camData.renderingPathCustomFrameSettings.lodBias = Settings.visuals.lod.Get() / 10f;
-            camData.antialiasing = (HDAdditionalCameraData.AntialiasingMode)Settings.visuals.aaMethod.Get();
-            camData.SMAAQuality = (HDAdditionalCameraData.SMAAQualityLevel)Settings.visuals.aaQuality.Get();
-            camData.TAAQuality = (HDAdditionalCameraData.TAAQualityLevel)Settings.visuals.aaQuality.Get();
-            camData.taaSharpenStrength = Settings.visuals.taaSharpen.Get();
-            cam.fieldOfView = Settings.visuals.fov.Get();
-            camData.allowDynamicResolution = Settings.visuals.dynamicRes.Get();
-        }
-
-		private float targetFOV;
-		private Vector2 mouse;
-		private Camera _camera;
-		[Header("Mouse/Cam")]
-		[SerializeField] private InputAction mouseMovement;
-		[SerializeField] private float upwardPitchAngle = -90.0f;
-		[SerializeField] private float downwardPitchAngle = 90.0f;
-
+		
 		public void UpdateCamera()
 		{
 			if (Core.Game.GameState != GameState.Active) { return; }
-			if (_camera.fieldOfView != targetFOV)
+			if (Camera.fieldOfView != targetFoV)
 			{
-				if ((Weapons.State == WeaponState.Idle && targetedWeapon == WeaponState.Aiming) || (targetedWeapon == WeaponState.Idle && Weapons.State == WeaponState.Aiming))
+				if ((Weapons.State == WeaponState.Idle && Weapons.Target == WeaponState.Aiming) || (Weapons.Target == WeaponState.Idle && Weapons.State == WeaponState.Aiming))
 				{
-					float dif = _camera.fieldOfView - targetFOV;
+					float dif = Camera.fieldOfView - targetFoV;
 					if (dif > 4f)
 					{
-						_camera.fieldOfView -= Weapons.Active.wpnData.fovSpeed * Time.deltaTime;
+						Camera.fieldOfView -= Weapons.Active.wpnData.fovSpeed * Time.deltaTime;
 					}
 					else if (dif < -4f)
 					{
-						_camera.fieldOfView += Weapons.Active.wpnData.fovSpeed * Time.deltaTime;
+						Camera.fieldOfView += Weapons.Active.wpnData.fovSpeed * Time.deltaTime;
 					}
 					else
 					{
-						Weapons.State = targetedWeapon;
-						_camera.fieldOfView = targetFOV;
+						Camera.fieldOfView = targetFoV;
+						Weapons.SetStateToTarget();
 					}
 				}
 			}
 
-			mouse = mouseMovement.ReadValue<Vector2>();
-			var yaw = mouse.x * Settings.controls.horizontalSensitivity.Get() / (Settings.visuals.fov.Get() / _camera.fieldOfView);
-			var pitch = -mouse.y * Settings.controls.verticalSensitivity.Get() / (Settings.visuals.fov.Get() / _camera.fieldOfView);
+			Vector2 mouse = Input.Mouse(); 
+			var yaw = mouse.x * Settings.controls.horizontalSensitivity.Get() / (Settings.visuals.fov.Get() / Camera.fieldOfView);
+			var pitch = -mouse.y * Settings.controls.verticalSensitivity.Get() / (Settings.visuals.fov.Get() / Camera.fieldOfView);
 
 			pitch = Mathf.Clamp(pitch, -180f, 180f);
 
 			if (!Player.StateData.clampYaw)
 			{
 				transform.rotation *= Quaternion.Euler(0.0f, yaw, 0.0f);
-				if (cam.transform.localRotation.eulerAngles.x <= upwardPitchAngle)
+				if (transform.localRotation.eulerAngles.x <= upwardPitchAngle)
 				{
-					if (cam.transform.localRotation.eulerAngles.x + pitch > upwardPitchAngle)
+					if (transform.localRotation.eulerAngles.x + pitch > upwardPitchAngle)
 					{
 						pitch = 0;
 					}
 				}
-				else if (cam.transform.localRotation.eulerAngles.x >= downwardPitchAngle)
+				else if (transform.localRotation.eulerAngles.x >= downwardPitchAngle)
 				{
-					if (cam.transform.localRotation.eulerAngles.x + pitch < downwardPitchAngle)
+					if (transform.localRotation.eulerAngles.x + pitch < downwardPitchAngle)
 					{
 						pitch = 0;
 					}
 				}
-				cam.transform.RotateAround(cam.transform.position, transform.right, pitch);//.localRotation *= Quaternion.Euler(pitch, 0f, 0f);
+				transform.RotateAround(transform.position, transform.right, pitch);//.localRotation *= Quaternion.Euler(pitch, 0f, 0f);
 			}
 			else
 			{
 				float x;
-				if (cam.transform.localRotation.eulerAngles.x > 180)
+				if (transform.localRotation.eulerAngles.x > 180)
 				{
-					x = Mathf.Clamp(cam.transform.localRotation.eulerAngles.x + pitch, 360 + upwardPitchAngle, 360 + downwardPitchAngle);
+					x = Mathf.Clamp(transform.localRotation.eulerAngles.x + pitch, 360 + upwardPitchAngle, 360 + downwardPitchAngle);
 				}
 				else
 				{
-					x = Mathf.Clamp(cam.transform.localRotation.eulerAngles.x + pitch, upwardPitchAngle, downwardPitchAngle);
+					x = Mathf.Clamp(transform.localRotation.eulerAngles.x + pitch, upwardPitchAngle, downwardPitchAngle);
 				}
 
 				float y;
-				if (cam.transform.localRotation.eulerAngles.y > 180)
+				if (transform.localRotation.eulerAngles.y > 180)
 				{
-					y = Mathf.Clamp(cam.transform.localRotation.eulerAngles.y + yaw, 360 + Player.StateData.minYawAngle, 360 + Player.StateData.maxYawAngle);
+					y = Mathf.Clamp(transform.localRotation.eulerAngles.y + yaw, 360 + Player.StateData.minYawAngle, 360 + Player.StateData.maxYawAngle);
 				}
 				else
 				{
-					y = Mathf.Clamp(cam.transform.localRotation.eulerAngles.y + yaw, Player.StateData.minYawAngle, Player.StateData.maxYawAngle);
+					y = Mathf.Clamp(transform.localRotation.eulerAngles.y + yaw, Player.StateData.minYawAngle, Player.StateData.maxYawAngle);
 				}
 
-				cam.transform.localRotation = Quaternion.Euler(x, y, 0.0f);
+				transform.localRotation = Quaternion.Euler(x, y, 0.0f);
 			}
+		}
+
+		public void UpdateSettings()
+		{
+			CamData.renderingPathCustomFrameSettings.lodBias = Settings.visuals.lod.Get() / 10f;
+			CamData.antialiasing = (HDAdditionalCameraData.AntialiasingMode)Settings.visuals.aaMethod.Get();
+			CamData.SMAAQuality = (HDAdditionalCameraData.SMAAQualityLevel)Settings.visuals.aaQuality.Get();
+			CamData.TAAQuality = (HDAdditionalCameraData.TAAQualityLevel)Settings.visuals.aaQuality.Get();
+			CamData.taaSharpenStrength = Settings.visuals.taaSharpen.Get();
+			Camera.fieldOfView = Settings.visuals.fov.Get();
+			CamData.allowDynamicResolution = Settings.visuals.dynamicRes.Get();
+		}
+
+		private float targetFoV;
+		public static void SetFoV(float fov, bool lerp)
+        {
+			active.targetFoV = fov;
+			if (!lerp)
+				Camera.fieldOfView = fov;
+        }
+
+		[SerializeField] private Vector3 startPosition;
+		[SerializeField] private Quaternion startRotation;
+		public void SetLoadingScreenPosition()
+		{
+			transform.SetPositionAndRotation(startPosition, startRotation);
 		}
 	}
 }

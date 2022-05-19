@@ -1,8 +1,10 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using GameWorld;
+using Core;
 using Core.GameSettings;
+using GameWorld;
 using Gameplay.Combat;
+using Gameplay.Interaction;
 
 namespace Gameplay
 {
@@ -18,14 +20,14 @@ namespace Gameplay
 		None,
 		Right
 	}
+
 	public static class Movement
     {
 		//References
-		private static Player player;
-		private static Transform transform;
 
 		private static float airTime;
 		private static bool grounded;
+		private static bool inWater;
 
 		[Header("Movement")]
 		public static float speed = 1f;
@@ -43,7 +45,7 @@ namespace Gameplay
 
 		public static void Init()
         {
-			player = Player.active;
+			
         }
 
 		public static bool CanChangeState(PlayerState newState, float newHead)
@@ -77,8 +79,8 @@ namespace Gameplay
 			if (!InputAllowed())
 				return;
 
-			if (Interaction.Active != null && Interaction.Active.interactionType == Interactable.InteractionType.Parkour)
-				Interaction.InteractWithActive();
+			if (Interact.Active != null && Interact.Active.Type() == InteractionType.Parkour)
+				Interact.InteractWithActive();
 			else
 				Player.State.GetInput(InputType.Jump);
 		}
@@ -87,40 +89,38 @@ namespace Gameplay
 
 		#region Riding
 
-		private static Horse activeHorse;
+		private static readonly Control unmountControl = new ("Unmount", false, InteractionType.Primary);
+		public static Horse ActiveHorse { get; private set; }
 		public static void MountHorse(Horse h)
 		{
-			Weapons.State = WeaponState.Idle;
-			targetedWeapon = WeaponState.Idle;
-			prevWeaponState = WeaponState.Idle;
-			_camera.fieldOfView = Settings.visuals.fov.Get();
-			Input.Drive = Vector2.zero;
-			activeHorse = h;
-			activeHorse.isUsed = true;
+			Weapons.Reset();	
+			Cam.Camera.fieldOfView = Settings.visuals.fov.Get();
+			//Input.Drive = Vector2.zero;
+			ActiveHorse = h;
+			ActiveHorse.isUsed = true;
 			fxAudio.Stop();
-			Player.Rigbody.velocity = Vector3.zero;
+			Player.Rigidbody.velocity = Vector3.zero;
 			Player.WallCollider.enabled = false;
 			Player.GroundCollider.enabled = false;
-			Player.Rigbody.constraints = RigidbodyConstraints.FreezeAll;
-			Player.Transform.SetPositionAndRotation(activeHorse.playerPos.position, activeHorse.playerPos.rotation);
+			Player.Rigidbody.constraints = RigidbodyConstraints.FreezeAll;
+			Player.Transform.SetPositionAndRotation(ActiveHorse.playerPos.position, ActiveHorse.playerPos.rotation);
 			Cam.active.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
-			Player.SetState(typeof(HorseStanding), false);
+			Player.SetState(new HorseStanding(), false);
 		}
-		private static void UnmountHorse()
+		public static void UnmountHorse()
 		{
-			RemoveControl(currentInteractName);
-			currentInteractable = null;
-			currentInteractName = string.Empty;
-			activeHorse.isUsed = false;
-			transform.position = activeHorse.exitPos.position;
-			wallCollider.enabled = true;
-			groundCollider.enabled = true;
-			rigbody.constraints = RigidbodyConstraints.FreezeRotation;
-			transform.rotation = Quaternion.Euler(0, transform.rotation.eulerAngles.y, 0);
-			cam.localRotation = Quaternion.Euler(0f, 0f, 0f);
-			activeHorse.OnLeave();
-			activeHorse = null;
-			ResetPlayer(true);
+			Interact.RemoveControl(unmountControl);
+			unmountControl.active = false;
+			ActiveHorse.isUsed = false;
+			Player.Transform.position = ActiveHorse.exitPos.position;
+			Player.WallCollider.enabled = true;
+			Player.GroundCollider.enabled = true;
+			Player.Rigidbody.constraints = RigidbodyConstraints.FreezeRotation;
+			Player.Transform.rotation = Quaternion.Euler(0, Player.Transform.rotation.eulerAngles.y, 0);
+			Cam.Camera.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+			ActiveHorse.OnLeave();
+			ActiveHorse = null;
+			Player.Reset(true);
 		}
 
 		#endregion
@@ -130,29 +130,27 @@ namespace Gameplay
 		private static Ladder activeLadder;
 		public static void UseLadder(Ladder ladder)
 		{
-			if (Weapons.State == WeaponState.Aiming || targetedWeapon == WeaponState.Aiming)
-				AimOut();
-			Weapons.State = WeaponState.Idle;
-			targetedWeapon = WeaponState.Idle;
-			prevWeaponState = WeaponState.Idle;
+			if (Weapons.State == WeaponState.Aiming || Weapons.Target == WeaponState.Aiming)
+				Weapons.AimOut();
+			Weapons.Reset();
 
-			targetFOV = Settings.visuals.fov.Get();
+			Cam.SetFoV(Settings.visuals.fov.Get(), true);
 			fxAudio.Stop();
-			Player.Rigbody.velocity = Vector3.zero;
+			Player.Rigidbody.velocity = Vector3.zero;
 			Player.WallCollider.enabled = false;
 			Player.GroundCollider.enabled = false;
-			currentLadder = ladder;
+			activeLadder = ladder;
 
-			transform.SetPositionAndRotation(ClosestPointOnLadder(ladder.start.position, ladder.end.position),
+			Player.Transform.SetPositionAndRotation(ClosestPointOnLadder(ladder.start.position, ladder.end.position),
 				Quaternion.Euler(0f, ladder.transform.rotation.y - 90f, 0f));
 			Cam.active.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
 
 			Player.SetState(new PlayerLadder(ladder), false);
-			HideWeapon();
+			Weapons.HideWeapon();
 		}
 		private static Vector3 ClosestPointOnLadder(Vector3 start, Vector3 end)
 		{
-			Vector3 v = transform.position - start;
+			Vector3 v = Player.Transform.position - start;
 			Vector3 dir = (end - start).normalized;
 
 			float d = Vector3.Distance(start, end);
@@ -167,23 +165,23 @@ namespace Gameplay
 		}
 		public static void ExitLadder()
 		{
-			wallCollider.enabled = true;
-			groundCollider.enabled = true;
-			rigbody.velocity = Vector3.zero;
-			rigbody.constraints = RigidbodyConstraints.FreezeRotation;
+			Player.WallCollider.enabled = true;
+			Player.GroundCollider.enabled = true;
+			Player.Rigidbody.velocity = Vector3.zero;
+			Player.Rigidbody.constraints = RigidbodyConstraints.FreezeRotation;
 
-			if ((transform.position - activeLadder.start.position).sqrMagnitude < (transform.position - activeLadder.end.position).sqrMagnitude)
-				transform.position = activeLadder.enter.position;
+			if ((Player.Transform.position - activeLadder.start.position).sqrMagnitude < (Player.Transform.position - activeLadder.end.position).sqrMagnitude)
+				Player.Transform.position = activeLadder.enter.position;
 			else
-				transform.position = activeLadder.exit.position;
+				Player.Transform.position = activeLadder.exit.position;
 
-			transform.rotation = Quaternion.Euler(0, transform.rotation.eulerAngles.y, 0);
-			cam.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+			Player.Transform.rotation = Quaternion.Euler(0, Player.Transform.rotation.eulerAngles.y, 0);
+			Cam.active.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
 
-			currentLadder.Exit();
-			currentLadder = null;
-			ResetPlayer(true);
-			DrawWeapon();
+			activeLadder.Exit();
+			activeLadder = null;
+			Player.Reset(true);
+			Weapons.DrawWeapon();
 		}
 
 		#endregion
@@ -191,13 +189,13 @@ namespace Gameplay
 		#region Vaulting
 
 		private static Vector3 vaultAngle;
-		public static void Unvault()
+		public static void FinishVault()
 		{
 			Player.WallCollider.enabled = true;
 			Player.GroundCollider.enabled = true;
-			Player.Rigbody.velocity = Vector3.zero;
-			Player.Rigbody.constraints = RigidbodyConstraints.FreezeRotation;
-			Player.ResetPlayer(true);
+			Player.Rigidbody.velocity = Vector3.zero;
+			Player.Rigidbody.constraints = RigidbodyConstraints.FreezeRotation;
+			Player.Reset(true);
 			Cam.active.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
 		}
 
@@ -209,18 +207,20 @@ namespace Gameplay
 		{
 			if (!inWater)
 			{
+				Audio.EnterWater();
 				inWater = true;
 				mixer.SetFloat("FX_Reverb_Mix", 0f);
-				fxAudio.PlayOneShot(diveIn);
+				Audio.PlayerSFX(diveIn);
 				ambientAudio.clip = waterIdle;
 				ambientAudio.Play();
 			}
 			else if (inWater)
 			{
+				Audio.LeaveWater();
 				inWater = false;
 				mixer.SetFloat("FX_Reverb_Mix", -80f);
 				ambientAudio.Stop();
-				fxAudio.PlayOneShot(diveOut);
+				Audio.PlayerSFX(diveOut);
 			}
 		}
 
@@ -228,7 +228,7 @@ namespace Gameplay
 
         #region Leaning
 
-        private static LeaningState leaningState = LeaningState.None;
+        public static LeaningState Lean { get; private set; } = LeaningState.None;
 
 		public static void OnLean(InputValue value)
 		{
@@ -249,7 +249,7 @@ namespace Gameplay
 			if (!InputAllowed())
                 return;
 
-			if (leaningState == to && leaningState != LeaningState.None)
+			if (Lean == to && Lean != LeaningState.None)
 			{
 				to = LeaningState.None;
 			}
@@ -277,7 +277,7 @@ namespace Gameplay
 
 			Cam.active.transform.localPosition = p;
 			Cam.active.transform.localRotation *= Quaternion.Euler(0, 0, rot - Cam.active.transform.localRotation.eulerAngles.z);
-			leaningState = to;
+			Lean = to;
 		}
 
         #endregion

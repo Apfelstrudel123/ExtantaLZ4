@@ -1,4 +1,6 @@
 using UnityEngine;
+using Gameplay.Interaction;
+
 namespace Gameplay
 {
     public class Horse : MonoBehaviour
@@ -13,12 +15,12 @@ namespace Gameplay
         private float health;
 
         [HideInInspector] public Rigidbody rig;
-        private Interactable interaction;
+        private Interactable interactable;
 
         void Start()
         {
             rig = GetComponent<Rigidbody>();
-            interaction = GetComponent<Interactable>();
+            interactable = GetComponent<Interactable>();
             rig.centerOfMass += new Vector3(0, -1, 0);
 
             health = maxHealth;
@@ -50,7 +52,7 @@ namespace Gameplay
 
         public void OnLeave()
         {
-            interaction.active = true;
+            interactable.active = true;
         }
     }
 }

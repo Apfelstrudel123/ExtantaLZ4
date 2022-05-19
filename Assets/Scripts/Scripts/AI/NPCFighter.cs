@@ -7,6 +7,8 @@ using System.Collections;
 using System.Collections.Generic;
 using ScriptableObjects;
 using Gameplay;
+using Gameplay.Interaction;
+
 namespace AI
 {
     public class NPCFighter : Human

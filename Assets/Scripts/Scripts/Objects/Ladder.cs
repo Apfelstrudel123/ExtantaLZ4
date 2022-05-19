@@ -1,4 +1,6 @@
 using UnityEngine;
+using Gameplay.Interaction;
+
 namespace GameWorld
 {
     public class Ladder : MonoBehaviour
@@ -8,16 +10,16 @@ namespace GameWorld
         public Transform enter;
         public Transform exit;
 
-        private Interactable interact;
+        private Interactable interactable;
 
         private void Start()
         {
-            interact = GetComponent<Interactable>();
+            interactable = GetComponent<Interactable>();
         }
 
         public void Exit()
         {
-            interact.active = true;
+            interactable.active = true;
         }
 
         public void Climb()

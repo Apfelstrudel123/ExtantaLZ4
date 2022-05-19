@@ -49,7 +49,7 @@ namespace UI
 
             ADD_AMMO = new DebugCommand<int>("add_ammo", "Adds ammo (int amount)", "add_ammo", (x) =>
             {
-                Core.Game.PlayerData.ammo[0] += x;
+                Core.Game.PlayerData.Ammo[0] += x;
                 GUI.UpdateAmmoBar();
             });
             ADD_NADE = new DebugCommand<int>("add_nade", "Adds grenades (int amount)", "add_nade", (x) =>

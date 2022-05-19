@@ -10,20 +10,15 @@ using Core.GameSettings;
 using UI;
 using Gameplay.Abilities;
 using Gameplay.Combat;
+using Gameplay.Interaction;
 
 namespace Gameplay
 { 
-	public enum ControlType
-	{
-		Interact = 0,
-		SecInteract = 1,
-		Parkour = 2,
-		Individual = 3,
-	}
 	public enum PlayerDetectionType
 	{
-		PickUp,
+		PickUp
 	}
+
 	[RequireComponent(typeof(Input))]
 	public class Player : MonoBehaviour
 	{
@@ -38,9 +33,11 @@ namespace Gameplay
 
 		public static Cam Cam { get => active.cam; private set => active.cam = value; }
 		
-		public static Rigidbody Rigbody { get; private set; }
+		public static Rigidbody Rigidbody { get; private set; }
 		public static CapsuleCollider WallCollider { get => active.wallCollider; private set => active.wallCollider = value; }
 		public static CapsuleCollider GroundCollider { get => active.groundCollider; private set => active.groundCollider = value; }
+
+		public static bool Grounded { get; private set; }
 
 		[Space()]
 		[Header("Object References")]
@@ -55,32 +52,10 @@ namespace Gameplay
 		{
 			active = this;
 
-			Rigbody = GetComponent<Rigidbody>();
+			Audio.SetPlayerSources(fxAudio);
+
+			Rigidbody = GetComponent<Rigidbody>();
 			health = GetComponent<ObjectHealth>();
-
-			_camera = cam.GetComponent<Camera>();
-
-			//Into weapons
-			List<WeaponData> wpns = new();
-			Addressables.LoadAssetsAsync<WeaponData>(wpnLabel, obj =>
-            {
-				wpns.Add(obj);
-            });
-			weaponDatas = wpns.ToArray();
-			for (int i = 0; i < weaponDatas.Length; i++)
-			{
-				weaponDatas[i].weaponID = i;
-			}
-			//
-
-			//Into inventory
-			PlayerItem[] p = Resources.LoadAll<PlayerItem>(itemPath);
-			items = new PlayerItem[p.Length];
-			for (int i = 0; i < p.Length; i++)
-			{
-				items[p[i].itemID] = p[i];
-			}
-			//
 
 			PlayerStateData[] sd = Resources.LoadAll<PlayerStateData>(stateDataPath);
 			for (int i = 0; i < sd.Length; i++)
@@ -91,8 +66,8 @@ namespace Gameplay
 			health.onDamage += TakeDamage;
 			cam.Init();
 			Movement.Init();
-			Weapons.Init(wpnLabel);
-			Inventory.Init(itemPath);
+            Weapons.Init(wpnLabel, wpnassetPath, weaponHolder, throwableSpawn);
+            Inventory.Init(itemPath);
 		}
 		public void Setup()
 		{
@@ -100,18 +75,13 @@ namespace Gameplay
 
 			mouseMovement.Enable();
 			//muzzleLight.enabled = false;
-			initialSwayPosition = weaponHolder.localPosition;
 
-			if (Game.PlayerData.ammo[0] < 30)
+			if (Game.PlayerData.Ammo[0] < 30)
 			{
-				Game.PlayerData.ammo[0] = 30;
+				Game.PlayerData.Ammo[0] = 30;
 			}
 
-			//TODO: Into weapons
-			LoadWeapon(Game.PlayerData.wpnKeys[0]);
-			weaponObj = Instantiate(weaponAsset.prefab, weaponHolder.position, weaponHolder.rotation, weaponHolder);
-			ammo = weaponDatas[GetWeaponIDByKey(Game.PlayerData.wpnKeys[0])].magSize;
-			//
+			Weapons.Setup();
 
 			health.ResetHealth();
 
@@ -126,35 +96,23 @@ namespace Gameplay
 			Game.GameState = GameState.Active;
 		}
 
-		public void CompleteReset()
-		{
-			Destroy(weaponObj);
-			ResetPlayer(true);
-		}
-
 		private void Update()
 		{
 			if (Game.PlayerStatus != PlayerStatus.Alive || Game.GameState != GameState.Active)
 			{
 				if (fxAudio.isPlaying)
-				{
 					fxAudio.Pause();
-				}
 				return;
 			}
 
 			if (!DebugConsole.instance.IsActive)
-			{
 				cam.UpdateCamera();
-			}
 		}
 
 		private void FixedUpdate()
 		{
 			if (Game.PlayerStatus != PlayerStatus.Alive || Game.GameState != GameState.Active)
-			{
 				return;
-			}
 
 			Grounded = Physics.CheckSphere(transform.position + StateData.groundCheck, groundDistance, groundMask, QueryTriggerInteraction.Ignore);
 
@@ -162,27 +120,14 @@ namespace Gameplay
 			PlayerCollider.instance.CheckCol();
 
 			if (!DebugConsole.instance.IsActive)
-			{
 				State.OnFixedUpdate();
-			}
 		}
 		private void LateUpdate()
 		{
 			if (Game.PlayerStatus != PlayerStatus.Alive || Game.GameState != GameState.Active)
-			{
 				return;
-			}
 
-			Vector2 m = -mouse * 0.002f;
-			if (Weapons.State == WeaponState.Aiming)
-			{
-				m /= 6;
-			}
-
-			m.x = Mathf.Clamp(m.x, -0.006f, 0.006f);
-			m.y = -Mathf.Clamp(m.y * 5, -0.06f, 0.06f);
-			Vector3 finalSwayPosition = new Vector3(m.x, m.y / 5, 0);
-			weaponHolder.localPosition = Vector3.Lerp(weaponHolder.localPosition, finalSwayPosition + initialSwayPosition, Time.deltaTime * 4);
+			Weapons.UpdateSway();
 		}
 
 		#endregion
@@ -214,100 +159,16 @@ namespace Gameplay
 		//[SerializeField] private Light muzzleflashLight = null;
 		[SerializeField] private float lightDuration = 0.02f;
 
-		#region Throwing
-
-		private Animator throwableAnim;
-		private bool throwOnLoaded = false;
-		private bool throwing = false;
-		public static int currentThrowable = 0;
-		private string[] throwableKeys = new string[] { "HEGrenade", "Molotov" };
-		[Header("Grenade Settings")]
+		[Header("Gadget Settings")]
 		public float grenadeSpawnDelay = 0.35f;
-		public Transform grenadeSpawnPoint;
-
-		private void OnSwitchThrowable(InputValue value)
-		{
-			if (Game.PlayerStatus != PlayerStatus.Alive || Game.GameState != GameState.Active && !DebugConsole.instance.IsActive)
-			{ return; }
-			currentThrowable += (int)(value.Get<float>() / 120f);
-
-			if (currentThrowable >= throwableKeys.Length)
-			{
-				currentThrowable %= throwableKeys.Length;
-			}
-			else if (currentThrowable < 0)
-			{
-				currentThrowable += throwableKeys.Length;
-			}
-
-            UI.GUI.UpdateAmmoBar();
-		}
-
-		private void OnThrow(InputValue value)
-		{
-			if (Game.PlayerStatus != PlayerStatus.Alive || Game.GameState != GameState.Active && !DebugConsole.instance.IsActive)
-				return;
-			if (State == PlayerLadder)
-				return;
-			if (Weapons.State == WeaponState.Reloading || Weapons.State == WeaponState.Aiming || targetedWeapon == WeaponState.Reloading 
-				|| targetedWeapon == WeaponState.Aiming)
-				return;
-
-			if (value.isPressed && !throwing)
-			{
-				if (targetedWeapon != WeaponState.Throwing && Game.PlayerData.gadgets[currentThrowable] > 0)
-				{
-					DisableWeapon();
-					throwing = true;
-					targetedWeapon = WeaponState.Throwing;
-					ObjectPool.Request(throwableKeys[currentThrowable], grenadeSpawnPoint.transform.position, grenadeSpawnPoint.transform.rotation, InitThrowable);
-				}
-			}
-			else if (throwing)
-			{
-				throwing = false;
-				if (Weapons.State == WeaponState.Throwing)
-				{
-					Game.PlayerData.gadgets[currentThrowable]--;
-                    UI.GUI.UpdateAmmoBar();
-					throwableAnim.SetTrigger("Throw");
-					Invoke(nameof(ThrowNade), 0.2f);
-				}
-				else if (targetedWeapon == WeaponState.Throwing)
-				{
-					throwOnLoaded = true;
-				}
-			}
-		}
-		private void InitThrowable(GameObject obj)
-		{
-			throwableAnim = obj.GetComponent<Animator>();
-			throwableAnim.Play("Equip", 0);
-			prevWeaponState = Weapons.State;
-			Weapons.State = WeaponState.Throwing;
-			if (throwOnLoaded)
-			{
-				Game.PlayerData.gadgets[currentThrowable]--;
-                UI.GUI.UpdateAmmoBar();
-				throwableAnim.SetTrigger("Throw");
-				Invoke(nameof(ThrowNade), 0.2f);
-			}
-		}
-		private void ThrowNade()
-		{
-			throwOnLoaded = false;
-			throwableAnim.SendMessage("Throw");
-			targetedWeapon = WeaponState.Idle;
-			Weapons.State = WeaponState.Idle;
-			DrawWeapon();
-		}
-
-		#endregion
+		[SerializeField] private Transform throwableSpawn;
 
 		#region Health
 
 		public static ObjectHealth health;
 		private float lastDamageSound = 0f;
+		private readonly Control healControl = new ("Heal", false, InteractionType.Individual);
+		private bool healOffered = false;
 		[Header("Health & Economy")]
 		[SerializeField] private float deathCamTime;
 		[SerializeField] private float respawnTime;
@@ -315,7 +176,7 @@ namespace Gameplay
 		private void OnHeal()
 		{
 			if (Weapons.State != WeaponState.Reloading && Weapons.State != WeaponState.Aiming && Weapons.State != WeaponState.Throwing
-				&& targetedWeapon == Weapons.State && health.currentHealth < health.maxHealth && Game.PlayerStatus == PlayerStatus.Alive
+				&& Weapons.Target == Weapons.State && health.currentHealth < health.maxHealth && Game.PlayerStatus == PlayerStatus.Alive
 				&& Game.GameState == GameState.Active && State != PlayerLadder && !DebugConsole.instance.IsActive)
 			{
 				Heal();
@@ -328,7 +189,7 @@ namespace Gameplay
 			if (healOffered)
 			{
 				healOffered = false;
-				RemoveControl("Heal");
+				Interact.RemoveControl(healControl);
 			}
 		}
 		public void TakeDamage(ObjectHealth.DamageType origin)
@@ -339,7 +200,7 @@ namespace Gameplay
 			GameWorld.Enviroment.instance.UpdateHealth(health.currentHealth);
 			if (health.currentHealth < 25 && !healOffered)
 			{
-				NewControl("Heal", ControlType.Individual);
+				Interact.NewControl(healControl);
 				healOffered = true;
 			}
 
@@ -379,48 +240,18 @@ namespace Gameplay
 			health.ResetHealth();
 			GameWorld.Enviroment.instance.UpdateHealth(health.currentHealth);
 
-			controlOffers.Clear();
-			controls.Clear();
-            UI.GUI.UpdateControlPanel(controls.ToArray(), controlOffers.ToArray());
+			Interact.Clear();
 		}
 		public void Respawn()
 		{
-			ResetPlayer(true);
-			rigbody.velocity = Vector3.zero;
+			Reset(true);
+			Rigidbody.velocity = Vector3.zero;
 			Game.PlayerStatus = PlayerStatus.Alive;
             UI.GUI.UnhideHUD();
-			weaponAnimator.SetBool("Aim", false);
-			weaponAnimator.SetBool("Running", false);
-			DrawWeapon();
-			cam.localRotation = Quaternion.Euler(0, 0, 0);
-		}
-
-		#endregion
-
-		#region UI
-
-		private static readonly List<string> controlOffers = new ();
-		private static readonly List<ControlType> controls = new ();
-		private bool healOffered = false;
-
-		private void NewControl(string name, ControlType c)
-		{
-			if (!controlOffers.Contains(name))
-			{
-				controls.Add(c);
-				controlOffers.Add(name);
-                UI.GUI.UpdateControlPanel(controls.ToArray(), controlOffers.ToArray());
-			}
-		}
-		public static void RemoveControl(string name)
-		{
-			//TODO: Get index + check index
-			if (!controlOffers.Contains(name))
-				return;
-			int i = controlOffers.IndexOf(name);
-			controlOffers.RemoveAt(i);
-			controls.RemoveAt(i);
-            UI.GUI.UpdateControlPanel(controls.ToArray(), controlOffers.ToArray());
+			Weapons.Active.wpnAnimator.SetBool("Aim", false);
+			Weapons.Active.wpnAnimator.SetBool("Running", false);
+			Weapons.DrawWeapon();
+			Cam.Transform.localRotation = Quaternion.Euler(0, 0, 0);
 		}
 
 		#endregion
@@ -475,16 +306,16 @@ namespace Gameplay
 				State.OnLeave();
 			}
 
-			active.stateData.TryGetValue(newState.Name, out StateData);
+			active.stateData.TryGetValue(newState.ToString, out StateData);
 
-			if (lightOn && !StateData.canTurnOnLight)
+			if (Weapons.LightOn && !StateData.canTurnOnLight)
 			{
-				SwitchLight();
+				Weapons.SwitchLight();
 			}
 
-			if (!StateData.canLean && leaningState != LeaningState.None)
+			if (!StateData.canLean && Movement.Lean != LeaningState.None)
 			{
-				SetLeaningState(LeaningState.None);
+				Movement.SetLeaningState(LeaningState.None);
 			}
 
 			if (immediately)
@@ -492,7 +323,7 @@ namespace Gameplay
 				State = (PlayerState)System.Activator.CreateInstance(newState);
 				State.OnEnter();
 
-				cam.position = Transform.position + StateData.camPosition;
+				Cam.Transform.position = Transform.position + StateData.camPosition;
 				GroundCollider.height = StateData.height;
 				GroundCollider.radius = StateData.radius;
 				WallCollider.height = StateData.wallHeight;
@@ -508,7 +339,7 @@ namespace Gameplay
 				State = (PlayerState)System.Activator.CreateInstance(newState);
 				State.OnEnter();
 
-				cam.position = Transform.position + StateData.camPosition;
+				Cam.Transform.position = Transform.position + StateData.camPosition;
 				GroundCollider.height = StateData.height;
 				GroundCollider.radius = StateData.radius;
 				WallCollider.height = StateData.wallHeight;
@@ -519,16 +350,20 @@ namespace Gameplay
 				Transform.position = Transform.position + new Vector3(0f, -StateData.groundCheck.y + lastY, 0f);
 			}
 		}
-		public void ResetPlayer(bool immediately)
+		public static void Reset(bool immediately)
 		{
-			if (lightOn) 
-				SwitchLight();
-			Weapons.State = WeaponState.Idle;
-			targetedWeapon = WeaponState.Idle;
-			prevWeaponState = WeaponState.Idle;
-			SetState(typeof(PlayerStanding), immediately);
-			_camera.fieldOfView = Settings.visuals.fov.Get();
-			targetFOV = Settings.visuals.fov.Get();
+			if (Weapons.LightOn) 
+				Weapons.SwitchLight();
+			Weapons.Reset();
+			SetState(new PlayerStanding(), immediately);
+			Cam.Camera.fieldOfView = Settings.visuals.fov.Get();
+			Cam.SetFoV(Settings.visuals.fov.Get(), true);
+		}
+
+		public void CompleteReset()
+		{
+			Destroy(weaponObj);
+			Reset(true);
 		}
 
 		#endregion
@@ -536,13 +371,13 @@ namespace Gameplay
 		[Space()][Header("Inventory")]
 		[SerializeField] private string itemPath = null;
 
-		public void FastTravel(Vector3 position, Quaternion rotation)
+		public static void FastTravel(Vector3 position, Quaternion rotation)
 		{
-			if (lightOn)
-				SwitchLight();
-			transform.SetPositionAndRotation(position, rotation);
-			ResetPlayer(false);
-			GetComponent<Rigidbody>().velocity = Vector3.zero;
+			if (Weapons.LightOn)
+				Weapons.SwitchLight();
+			Transform.SetPositionAndRotation(position, rotation);
+			Reset(false);
+            Rigidbody.velocity = Vector3.zero;
 		}
 	}
 
@@ -553,10 +388,22 @@ namespace Gameplay
 		public abstract void GetInput(InputType inputType);
 		public abstract void OnLeave();
 
-        public override bool Equals(object obj)
+		public override int GetHashCode()
+		{
+			return base.GetHashCode();
+		}
+		public override bool Equals(object obj)
         {
             return GetType() == obj.GetType();
         }
+		public static bool operator ==(PlayerState lhs, PlayerState rhs)
+        {
+			return lhs.Equals(rhs);
+        }
+		public static bool operator !=(PlayerState lhs, PlayerState rhs)
+		{
+			return !lhs.Equals(rhs);
+		}   
     }
 
 	public class PlayerStanding : PlayerState
@@ -571,18 +418,18 @@ namespace Gameplay
 			{
 				Player.SetState(new PlayerFalling(), false);
 			}
-			else if (Input.Run && Input.Move.y > 0 && Weapons.State != WeaponState.Aiming && Player.instance.targetedWeapon != WeaponState.Aiming)
+			else if (Input.Run && Input.Move.y > 0 && Weapons.State != WeaponState.Aiming && Weapons.Target != WeaponState.Aiming)
 			{
 				Player.SetState(new PlayerRunning(), false);
 			}
 			else
 			{
-				Interaction.Update();
+				Interact.Update();
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward * Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.Rigbody.MovePosition(Player.Transform.position + v * Player.instance.speed);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.instance.speed);
 
-				Player.Rigbody.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 			}
 		}
 		public override void GetInput(InputType inputType)
@@ -590,17 +437,17 @@ namespace Gameplay
 			switch (inputType)
 			{
 				case InputType.Crouch:
-					Player.SetState(typeof(PlayerCrouching), false);
+					Player.SetState(new PlayerCrouching(), false);
 					break;
 				case InputType.Prone:
-					Player.SetState(typeof(PlayerProning), false);
+					Player.SetState(new PlayerProning(), false);
 					break;
 				case InputType.Jump:
-					Player.Rigbody.velocity = Vector3.zero;
+					Player.Rigidbody.velocity = Vector3.zero;
 					Vector3 v = Player.Transform.right * Input.Move.x * Player.instance.speed 
 						+ Player.Transform.forward * Input.Move.y * Player.instance.speed;
 					v.y = Player.instance.jumpHeight;
-					Player.Rigbody.AddForce(v, ForceMode.VelocityChange);
+					Player.Rigidbody.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}
 		}
@@ -625,13 +472,12 @@ namespace Gameplay
 		public override void OnFixedUpdate()
 		{
 			Weapons.Update();
-			Player.Rigbody.MovePosition(Player.Transform.position + new UnityEngine.Vector3
-				(Player.instance.vaultAngle.x, 0f, Player.instance.vaultAngle.z) * Time.fixedDeltaTime);
+			Player.Rigidbody.MovePosition(Player.Transform.position + new Vector3(Player.instance.vaultAngle.x, 0f, Player.instance.vaultAngle.z) * Time.fixedDeltaTime);
 		}
 
 		public override void OnLeave()
 		{
-			Player.instance.Unvault();
+			Movement.FinishVault();
 		}
 	}
 
@@ -642,17 +488,16 @@ namespace Gameplay
 			switch (inputType)
 			{
 				case InputType.Crouch:
-					Player.SetState(typeof(PlayerCrouching), false);
+					Player.SetState(new PlayerCrouching(), false);
 					break;
 				case InputType.Prone:
-					Player.SetState(typeof(PlayerProning), false);
+					Player.SetState(new PlayerProning(), false);
 					break;
 				case InputType.Jump:
-					Player.Rigbody.velocity = Vector3.zero;
-					Vector3 v = Player.Transform.right * Input.Move.x * Player.instance.speed +
-						Player.Transform.forward * Input.Move.y * Player.instance.runningSpeed;
+					Player.Rigidbody.velocity = Vector3.zero;
+					Vector3 v = Player.Transform.right * Input.Move.x * Player.instance.speed +	Player.Transform.forward * Input.Move.y * Player.instance.runningSpeed;
 					v.y = Player.instance.jumpHeight;
-					Player.Rigbody.AddForce(v, ForceMode.VelocityChange);
+					Player.Rigidbody.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}
 		}
@@ -663,17 +508,17 @@ namespace Gameplay
 		}
 		public override void OnFixedUpdate()
 		{
-			if (!Player.grounded)
+			if (!Player.Grounded)
 			{
-				Player.SetState(typeof(PlayerFalling), false);
+				Player.SetState(new PlayerFalling(), false);
 			}
 			if (!Input.Run || Input.Move.y <= 0)
 			{
-				Player.SetState(typeof(PlayerStanding), false);
+				Player.SetState(new PlayerStanding(), false);
 			}
 			else
 			{
-				Interaction.Update();
+				Interact.Update();
 				Weapons.Update();
 				float x = Input.Move.x;
 				float z = Input.Move.y;
@@ -685,9 +530,9 @@ namespace Gameplay
 				}*/
 				Vector3 v = (Player.Transform.right * x * Player.instance.speed + Player.Transform.forward * z * Player.instance.runningSpeed) * Time.fixedDeltaTime;
 
-				Player.Rigbody.MovePosition(Player.Transform.position + v);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v);
 
-				Player.Rigbody.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 				AbilitySystem.UpdateValue(AbilityCategory.Endurance, Time.fixedDeltaTime * 2);
 			}
 		}
@@ -713,16 +558,16 @@ namespace Gameplay
 		{
 			if (Player.Grounded)
 			{
-				Player.SetState(typeof(PlayerStanding), false);
+				Player.SetState(new PlayerStanding(), false);
 			}
 			else
 			{
-				Interaction.Update();
+				Interact.Update();
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward * Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.Rigbody.MovePosition(Player.Transform.position + v);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v);
 
-				Player.Rigbody.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 				AbilitySystem.UpdateValue(AbilityCategory.Endurance, Time.fixedDeltaTime * 2);
 			}
 		}
@@ -743,20 +588,20 @@ namespace Gameplay
 		{
 			if (!Player.Grounded)
 			{
-				Player.SetState(typeof(PlayerFalling), false);
+				Player.SetState(new PlayerFalling(), false);
 			}
 			else if (Input.Run && Input.Move.y > 0 && Weapons.State != WeaponState.Aiming)
 			{
-				Player.SetState(typeof(PlayerRunning), false);
+				Player.SetState(new PlayerRunning(), false);
 			}
 			else
 			{
-				Interaction.Update();
+				Interact.Update();
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward * Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.Rigbody.MovePosition(Player.Transform.position + v * Player.instance.proneSpeed);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.instance.proneSpeed);
 
-				Player.Rigbody.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 			}
 		}
 		public override void GetInput(InputType inputType)
@@ -766,19 +611,19 @@ namespace Gameplay
 				case InputType.Crouch:
 					if (Player.CanChangeState(typeof(PlayerCrouching), 0.55f))
 					{
-						Player.SetState(typeof(PlayerCrouching), false);
+						Player.SetState(new PlayerCrouching(), false);
 					}
 					break;
 				case InputType.Prone:
 					if (Player.CanChangeState(typeof(PlayerStanding), 0.54f))
 					{
-						Player.SetState(typeof(PlayerStanding), false);
+						Player.SetState(new PlayerStanding(), false);
 					}
 					break;
 				case InputType.Jump:
 					if (Player.CanChangeState(typeof(PlayerStanding), 0.54f))
 					{
-						Player.SetState(typeof(PlayerStanding), false);
+						Player.SetState(new PlayerStanding(), false);
 					}
 					break;
 			}
@@ -799,21 +644,21 @@ namespace Gameplay
 		{
 			if (!Player.Grounded)
 			{
-				Player.SetState(typeof(PlayerFalling), false);
+				Player.SetState(new PlayerFalling(), false);
 			}
 			else if (Input.Run && Input.Move.y > 0 && Weapons.State != WeaponState.Aiming)
 			{
-				Player.SetState(typeof(PlayerRunning), false);
+				Player.SetState(new PlayerRunning(), false);
 			}
 			else
 			{
-				Interaction.Update();
+				Interact.Update();
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward 
 					* Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.Rigbody.MovePosition(Player.Transform.position + v * Player.instance.crouchSpeed);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.instance.crouchSpeed);
 
-				Player.Rigbody.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 			}
 		}
 		public override void GetInput(InputType inputType)
@@ -823,19 +668,19 @@ namespace Gameplay
 				case InputType.Crouch:
 					if (Player.CanChangeState(typeof(PlayerStanding), 0.54f))
 					{
-						Player.SetState(typeof(PlayerStanding), false);
+						Player.SetState(new PlayerStanding(), false);
 					}
 					break;
 				case InputType.Prone:
 					if (Player.CanChangeState(typeof(PlayerProning), 0f))
 					{
-						Player.SetState(typeof(PlayerProning), false);
+						Player.SetState(new PlayerProning(), false);
 					}
 					break;
 				case InputType.Jump:
 					if (Player.CanChangeState(typeof(PlayerStanding), 0.54f))
 					{
-						Player.SetState(typeof(PlayerStanding), false);
+						Player.SetState(new PlayerStanding(), false);
 					}
 					break;
 			}
@@ -864,19 +709,18 @@ namespace Gameplay
 			}
 			else
 			{
-				Interaction.Update();
+				Interact.Update();
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward * Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.instance.currentHorse.rig.MovePosition(Player.instance.currentHorse.transform.position + v * 2.5f);
+				Movement.ActiveHorse.rig.MovePosition(Movement.ActiveHorse.transform.position + v * 2.5f);
 
-				Player.instance.currentHorse.rig.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Movement.ActiveHorse.rig.AddForce(Physics.gravity, ForceMode.Acceleration);
 
 				float rot = Input.Move.x * Time.fixedDeltaTime * 50f;
 				if (Input.Move.y < 0)
 				{ rot *= -1; }
-				Player.instance.currentHorse.transform.Rotate(0f, rot, 0f);
-				Player.Transform.SetPositionAndRotation(Player.instance.currentHorse.playerPos.position, 
-					Player.instance.currentHorse.playerPos.rotation);
+				Movement.ActiveHorse.transform.Rotate(0f, rot, 0f);
+				Player.Transform.SetPositionAndRotation(Movement.ActiveHorse.playerPos.position, Movement.ActiveHorse.playerPos.rotation);
 				AbilitySystem.UpdateValue(AbilityCategory.Riding, Time.fixedDeltaTime);
 			}
 		}
@@ -891,11 +735,10 @@ namespace Gameplay
 					Player.SetState(new PlayerProning(), false);
 					break;
 				case InputType.Jump:
-					Player.instance.currentHorse.rig.velocity = Vector3.zero;
-					Vector3 v = Player.instance.currentHorse.transform.right * Input.Move.x 
-						+ Player.instance.currentHorse.transform.forward * Input.Move.y * 2f;
+					Movement.ActiveHorse.rig.velocity = Vector3.zero;
+					Vector3 v = Movement.ActiveHorse.transform.right * Input.Move.x + 2f * Input.Move.y * Movement.ActiveHorse.transform.forward;
 					v.y = Player.instance.jumpHeight;
-					Player.instance.currentHorse.rig.AddForce(v, ForceMode.VelocityChange);
+					Movement.ActiveHorse.rig.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}
 		}
@@ -918,11 +761,10 @@ namespace Gameplay
 					Player.SetState(new PlayerProning(), false);
 					break;
 				case InputType.Jump:
-					Player.instance.currentHorse.rig.velocity = Vector3.zero;
-					Vector3 v = Player.instance.currentHorse.transform.right * Input.Move.x * 2f 
-						+ Player.instance.currentHorse.transform.forward * Input.Move.y * 6f;
+					Movement.ActiveHorse.rig.velocity = Vector3.zero;
+					Vector3 v = 2f * Input.Move.x * Movement.ActiveHorse.transform.right + Movement.ActiveHorse.transform.forward * Input.Move.y * 6f;
 					v.y = Player.instance.jumpHeight;
-					Player.instance.currentHorse.rig.AddForce(v, ForceMode.VelocityChange);
+					Movement.ActiveHorse.rig.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}
 		}
@@ -937,13 +779,13 @@ namespace Gameplay
 			{
 				Player.SetState(new HorseFalling(), false);
 			}
-			if (!Input.Run || Player.instance.moveInput.y <= 0)
+			if (!Input.Run || Input.Move.y <= 0)
 			{
 				Player.SetState(new HorseStanding(), false);
 			}
 			else
 			{
-				Interaction.Update();
+				Interaction.Interact.Update();
 				Weapons.Update();
 				float x = Input.Move.x;
 				float z = Input.Move.y;
@@ -952,16 +794,16 @@ namespace Gameplay
 				//x = n.normalized.x;
 				//z = n.normalized.y;
 
-				Vector3 v = (Player.Transform.right * x * 2.5f + Player.Transform.forward * z * 8f) * Time.fixedDeltaTime;
+				Vector3 v = (2.5f * x * Player.Transform.right + 8f * z * Player.Transform.forward) * Time.fixedDeltaTime;
 
-				Movement.activeHorse.rig.MovePosition(Movement.activeHorse.transform.position + v);
+				Movement.ActiveHorse.rig.MovePosition(Movement.ActiveHorse.transform.position + v);
 
 				float rot = x * Time.fixedDeltaTime * 50f;
 				if (z < 0)
 				{ rot *= -1; }
-				Movement.activeHorse.rig.AddForce(Physics.gravity, ForceMode.Acceleration);
-				Movement.activeHorse.transform.Rotate(0f, rot, 0f);
-				Player.active.transform.SetPositionAndRotation(Movement.activeHorse.playerPos.position, Movement.activeHorse.playerPos.rotation);
+				Movement.ActiveHorse.rig.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Movement.ActiveHorse.transform.Rotate(0f, rot, 0f);
+				Player.active.transform.SetPositionAndRotation(Movement.ActiveHorse.playerPos.position, Movement.ActiveHorse.playerPos.rotation);
 				AbilitySystem.UpdateValue(AbilityCategory.Riding, Time.fixedDeltaTime * 2);
 			}
 		}
@@ -991,12 +833,12 @@ namespace Gameplay
 			}
 			else
 			{
-				Interaction.Update();
+				Interaction.Interact.Update();
 				Weapons.Update();
 
-				Movement.activeHorse.rig.AddForce(Physics.gravity, ForceMode.Acceleration);
-				Player.active.transform.SetPositionAndRotation(Movement.activeHorse.currentHorse.playerPos.position,
-					Movement.activeHorse.currentHorse.playerPos.rotation);
+				Movement.ActiveHorse.rig.AddForce(Physics.gravity, ForceMode.Acceleration);
+				Player.active.transform.SetPositionAndRotation(Movement.ActiveHorse.playerPos.position,
+					Movement.ActiveHorse.playerPos.rotation);
 			}
 		}
 
@@ -1051,7 +893,7 @@ namespace Gameplay
 
 			}
 
-			Player.Rigbody.MovePosition(Player.Transform.position + v);
+			Player.Rigidbody.MovePosition(Player.Transform.position + v);
 		}
 		public override void GetInput(InputType inputType)
 		{

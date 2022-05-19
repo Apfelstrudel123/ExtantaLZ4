@@ -24,10 +24,11 @@ public struct PlayerData
     public int[] itemCounts;
 
     //Weapons
+    public int slot;
     public int holsterSize;
     public string[] wpnKeys;
     public int ammoSize;
-    public int[] ammo;
+    public int[] Ammo { get; set; }
     public int[] gadgetsSize;
     public int[] gadgets;
 

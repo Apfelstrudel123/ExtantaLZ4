@@ -29,8 +29,8 @@ namespace ScriptableObjects
         public float mass = 20f;
 
         [Header("Durations")]
-        public float equipTime = 0.25f;
-        public float holsterTime = 0.25f;
-        public float reloadTime;
+        public int equipTime = 250;
+        public int holsterTime = 250;
+        public int reloadTime = 3000;
     }
 }

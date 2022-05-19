@@ -3,6 +3,8 @@ using UnityEngine.AI;
 using UnityEngine.Rendering.HighDefinition;
 using System.Collections;
 using System.Collections.Generic;
+using Gameplay.Interaction;
+
 namespace AI
 {
     public class Pedestrian : Human

@@ -121,17 +121,14 @@ namespace Core
                 }
                 return;
             }
-            StartCoroutine(WaitForLoad(data[type].prefabs[i], type, position, rotation, onLoaded));
+            WaitForLoad(data[type].prefabs[i], type, position, rotation, onLoaded);
         }
 
-        public static IEnumerator WaitForLoad(string key, int type, Vector3 position, Quaternion rotation, System.Action<GameObject> onLoaded)
+        public static async void WaitForLoad(string key, int type, Vector3 position, Quaternion rotation, System.Action<GameObject> onLoaded)
         {
-            AsyncOperationHandle<GameObject> a = Addressables.LoadAssetAsync<GameObject>(key);
-            yield return a;
-            prefabs[type] = a.Result;
+            GameObject go = await Addressables.InstantiateAsync(key, position, rotation).Task;
 
-            GameObject go = Object.Instantiate(a.Result, position, rotation);
-
+            prefabs[type] = go;
             objects[type].Add(go);
 
             if (onLoaded != null)

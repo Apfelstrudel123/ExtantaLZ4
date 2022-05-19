@@ -11,6 +11,16 @@ namespace Gameplay
 		private static int invSizeX = 25;
 		private static int invSizeY = 30;
 
+		public static void Init(string itemPath)
+        {
+			PlayerItem[] p = Resources.LoadAll<PlayerItem>(itemPath);
+			items = new PlayerItem[p.Length];
+			for (int i = 0; i < p.Length; i++)
+			{
+				items[p[i].itemID] = p[i];
+			}
+		}
+
 		public static bool CanAddItem(int id, out Vector2 loc)
 		{
 			int w = items[id].width;
@@ -66,9 +76,9 @@ namespace Gameplay
 		{
 			if (items[id].category == PlayerItem.ShopCategory.Ammo)
 			{
-				Game.PlayerData.ammo[0] += count;
-				if (Game.PlayerData.ammo[0] > Game.PlayerData.ammoSize)
-					Game.PlayerData.ammo[0] = Game.PlayerData.ammoSize;
+				Game.PlayerData.Ammo[0] += count;
+				if (Game.PlayerData.Ammo[0] > Game.PlayerData.ammoSize)
+					Game.PlayerData.Ammo[0] = Game.PlayerData.ammoSize;
 			}
 			else if (items[id].category == PlayerItem.ShopCategory.Gadgets)
             {

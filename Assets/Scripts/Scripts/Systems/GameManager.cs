@@ -235,7 +235,7 @@ namespace Core
         }
         public void PlayerDie()
         {
-            Teleport(Gameplay.Player.position, Gameplay.Player.active.transform.rotation);
+            Teleport(Gameplay.Player.Transform.position, Gameplay.Player.Transform.rotation);
         }
         private void Teleport(Vector3 pos, Quaternion rot)
         {

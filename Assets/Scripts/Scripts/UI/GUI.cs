@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
+using Gameplay.Interaction;
 
 namespace UI
 {
@@ -159,10 +160,10 @@ namespace UI
         }
         private void UpdateAmmo()
         {
-            ammoText.text = Core.Game.PlayerData.ammo.ToString();
-            throwableText.text = Core.Game.PlayerData.gadgets[Gameplay.Player.currentThrowable].ToString();
+            ammoText.text = Core.Game.PlayerData.Ammo[0].ToString();
+            throwableText.text = Core.Game.PlayerData.gadgets[Gameplay.Combat.Weapons.activeGadget].ToString();
 
-            int ammo = Core.Game.PlayerData.ammo;
+            int ammo = Core.Game.PlayerData.Ammo[0];
             int magSize = Gameplay.Combat.Weapons.Active.wpnData.magSize;
 
             if (ammo < 1)
@@ -174,47 +175,42 @@ namespace UI
                 ammoImg.transform.localPosition = new Vector3(120f * (1f - ((float)ammo / (float)magSize)), 0, 0);
             }
 
-            throwableImage.sprite = throwableIcons[Gameplay.Player.currentThrowable];
+            throwableImage.sprite = throwableIcons[Gameplay.Combat.Weapons.activeGadget];
         }
 
-        public static void UpdateControlPanel(Gameplay.ControlType[] controls, string[] controlOffers)
+        public static void UpdateControlPanel(IInteractable[] interactables)
         {
-            instance.UpdateActions(controls, controlOffers);
+            instance.UpdateActions(interactables);
         }
 
         private TMPro.TMP_Text[] actionTexts = null;
         private TMPro.TMP_Text[] controlTexts = null;
-        private void UpdateActions(Gameplay.ControlType[] controls, string[] controlOffers)
+        private void UpdateActions(IInteractable[] interactables)
         {
-            int count;
-            if (controlOffers.Length > 3)
-            {
-                count = 3;
-            }
-            else
-            {
-                count = controlOffers.Length;
-            }
+            if (interactables == null)
+                Debug.Log("Untested: Check for null");
+
+            int count =  interactables.Length <= 3 ? interactables.Length : 3;
 
             for (int i = 0; i < count; i++)
             {
                 controlOfferObjects[i].gameObject.SetActive(true);
-                actionTexts[i].text = controlOffers[i];
-                if (controls[i] == Gameplay.ControlType.Interact)
+                actionTexts[i].text = interactables[i].Name();
+                if (interactables[i].Type() == InteractionType.Primary)
                 {
                     controlTexts[i].text = "[" + Core.GameManager.Input.FindAction("Interact").GetBindingDisplayString(InputBinding.DisplayStringOptions.DontIncludeInteractions) + "]";
                 }
-                else if (controls[i] == Gameplay.ControlType.SecInteract)
+                else if(interactables[i].Type() == InteractionType.Secondary)
                 {
                     controlTexts[i].text = "[" + Core.GameManager.Input.FindAction("SecInteract").GetBindingDisplayString(InputBinding.DisplayStringOptions.DontIncludeInteractions) + "]";
                 }
-                else if (controls[i] == Gameplay.ControlType.Parkour)
+                else if (interactables[i].Type() == InteractionType.Parkour)
                 {
                     controlTexts[i].text = "[" + Core.GameManager.Input.FindAction("Jump").GetBindingDisplayString(InputBinding.DisplayStringOptions.DontIncludeInteractions) + "]";
                 }
-                else if (controls[i] == Gameplay.ControlType.Individual)
+                else if (interactables[i].Type() == InteractionType.Individual)
                 {
-                    controlTexts[i].text = "[" + Core.GameManager.Input.FindAction(controlOffers[i]).GetBindingDisplayString(InputBinding.DisplayStringOptions.DontIncludeInteractions) + "]";
+                    controlTexts[i].text = "[" + Core.GameManager.Input.FindAction(interactables[i].Name()).GetBindingDisplayString(InputBinding.DisplayStringOptions.DontIncludeInteractions) + "]";
                 }
             }
             for (int d = count; d < controlOfferObjects.Length; d++)
