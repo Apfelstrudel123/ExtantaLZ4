@@ -9,16 +9,14 @@ using Core;
 
 namespace Gameplay.Combat
 {
-	public enum WeaponState
-	{
+	public enum WeaponState {
 		Idle,
 		Reloading,
 		Aiming,
 		Throwing
 	}
 
-	public struct Weapon
-    {
+	public struct Weapon {
 		public UnityEngine.GameObject wpnObject;
 		public UnityEngine.Animator wpnAnimator;
 		public WeaponData wpnData;
@@ -26,14 +24,13 @@ namespace Gameplay.Combat
 		public AsyncOperationHandle<WeaponAssets> wpnHandle;
 	}
 
-    public static class Weapons
-    {
+    public static class Weapons {
         #region CFG & Data
 
         private static WeaponData[] wpnDatas;
 		private static string assetPath;
 		private static Transform holder;
-		private static Transform throwableSpawn;
+		private static Transform gadgetSpawn;
 
         public readonly static List<Weapon> weapons = new();
 		public static int Slot { get; private set; }
@@ -51,14 +48,14 @@ namespace Gameplay.Combat
         {
 			assetPath = wpnassetPath;
 			holder = _wpnHolder;
-			throwableSpawn = throwSpawn;
+			gadgetSpawn = throwSpawn;
 			Slot = 0;
 
 			List<WeaponData> wpns = new();
-			Addressables.LoadAssetsAsync<WeaponData>(_wpndataLabel, obj =>
-			{
+			Addressables.LoadAssetsAsync<WeaponData>(_wpndataLabel, obj => {
 				wpns.Add(obj);
 			});
+			
 			wpnDatas = wpns.ToArray();
 			for (int i = 0; i < wpnDatas.Length; i++)
 			{
@@ -125,8 +122,7 @@ namespace Gameplay.Combat
 			State = Target;
 		}
 
-		public static void Reset()
-		{
+		public static void Reset() {
 			State = WeaponState.Idle;
 			Target = WeaponState.Idle;
 			prevWeaponState = WeaponState.Idle;
@@ -241,8 +237,8 @@ namespace Gameplay.Combat
 		{
 			if (Game.PlayerStatus != PlayerStatus.Alive || Game.GameState != GameState.Active || Game.PlayerData.Ammo[0] <= 0 || UI.DebugConsole.instance.IsActive)
 				return;
-			if (Player.State == PlayerRunning || Player.State == PlayerLadder)
-				return;
+			//if (Player.State == PlayerRunning || Player.State == PlayerLadder)
+			//	return; TODO
 			if ((State != WeaponState.Idle && State != WeaponState.Aiming) || (Target != WeaponState.Idle && Target != WeaponState.Aiming))
 				return;
 
@@ -326,8 +322,8 @@ namespace Gameplay.Combat
 		private static CancellationTokenSource reloadTask;
 		public static void Reload()
 		{
-			if (Player.State == PlayerLadder || Game.PlayerData.Ammo[0] >= Active.wpnData.magSize || Game.PlayerData.Ammo[0] < 1)
-				return;
+			//if (Player.State == PlayerLadder || Game.PlayerData.Ammo[0] >= Active.wpnData.magSize || Game.PlayerData.Ammo[0] < 1)
+			//	return; TODO
 
 			if (State == WeaponState.Idle && Target == WeaponState.Idle)
 			{
@@ -425,8 +421,8 @@ namespace Gameplay.Combat
 
 		public static void OnThrow(bool pressed)
 		{
-			if (State == PlayerLadder)
-				return;
+			//if (State == PlayerLadder) TODO
+			//	return;
 			if (State == WeaponState.Reloading || State == WeaponState.Aiming || Target == WeaponState.Reloading || Target == WeaponState.Aiming)
 				return;
 
@@ -437,7 +433,7 @@ namespace Gameplay.Combat
 					DisableWeapon();
 					throwing = true;
 					Target = WeaponState.Throwing;
-					ObjectPool.Request(gadgetKeys[activeGadget], throwableSpawn.position, throwableSpawn.rotation, InitThrowable);
+					ObjectPool.Request(gadgetKeys[activeGadget], gadgetSpawn.position, gadgetSpawn.rotation, InitThrowable);
 				}
 			}
 			else if (throwing)

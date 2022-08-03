@@ -113,7 +113,7 @@ namespace Impact.Triggers
                     for (int i = 0; i < count; i++)
                     {
                         ImpactMaterialComposition comp = ImpactManagerInstance.MaterialCompositionBuffer[i];
-                        if (comp.CompositionValue > 0)
+                        if (comp.CompositionValue > 0 && comp.Material != null)
                         {
                             IInteractionData newInteractionData = interactionData.Clone();
                             newInteractionData.CompositionValue = comp.CompositionValue;
@@ -236,7 +236,7 @@ namespace Impact.Triggers
                     for (int i = 0; i < count; i++)
                     {
                         ImpactMaterialComposition comp = ImpactManagerInstance.MaterialCompositionBuffer[i];
-                        if (comp.CompositionValue > 0)
+                        if (comp.CompositionValue > 0 && comp.Material != null)
                         {
                             IInteractionData newInteractionData = interactionData.Clone();
                             newInteractionData.CompositionValue = comp.CompositionValue;

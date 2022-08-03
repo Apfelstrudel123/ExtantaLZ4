@@ -98,7 +98,7 @@ namespace Gameplay
 			//Input.Drive = Vector2.zero;
 			ActiveHorse = h;
 			ActiveHorse.isUsed = true;
-			fxAudio.Stop();
+			//fxAudio.Stop(); TODO
 			Player.Rigidbody.velocity = Vector3.zero;
 			Player.WallCollider.enabled = false;
 			Player.GroundCollider.enabled = false;
@@ -131,11 +131,11 @@ namespace Gameplay
 		public static void UseLadder(Ladder ladder)
 		{
 			if (Weapons.State == WeaponState.Aiming || Weapons.Target == WeaponState.Aiming)
-				Weapons.AimOut();
+				// TODO Weapons.AimOut();
 			Weapons.Reset();
 
 			Cam.SetFoV(Settings.visuals.fov.Get(), true);
-			fxAudio.Stop();
+			// fxAudio.Stop(); TODO
 			Player.Rigidbody.velocity = Vector3.zero;
 			Player.WallCollider.enabled = false;
 			Player.GroundCollider.enabled = false;
@@ -188,7 +188,8 @@ namespace Gameplay
 
 		#region Vaulting
 
-		private static Vector3 vaultAngle;
+		public static Vector3 vaultAngle {get; private set;}
+
 		public static void FinishVault()
 		{
 			Player.WallCollider.enabled = true;
@@ -203,24 +204,18 @@ namespace Gameplay
 
         #region Water Interaction
 
-        private static void Dive()
-		{
-			if (!inWater)
-			{
+        private static void Dive() {
+			if (!inWater) {
 				Audio.EnterWater();
 				inWater = true;
-				mixer.SetFloat("FX_Reverb_Mix", 0f);
-				Audio.PlayerSFX(diveIn);
-				ambientAudio.clip = waterIdle;
-				ambientAudio.Play();
+				Audio.mixer.SetFloat("FX_Reverb_Mix", 0f);
+				Audio.EnterWater();
 			}
-			else if (inWater)
-			{
+			else {
 				Audio.LeaveWater();
 				inWater = false;
-				mixer.SetFloat("FX_Reverb_Mix", -80f);
-				ambientAudio.Stop();
-				Audio.PlayerSFX(diveOut);
+				Audio.mixer.SetFloat("FX_Reverb_Mix", -80f);
+				Audio.LeaveWater();
 			}
 		}
 

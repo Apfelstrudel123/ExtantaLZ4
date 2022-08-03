@@ -1,84 +1,76 @@
 using UnityEngine;
-namespace Core
+
+namespace Core 
 {
-    namespace GameSettings
+    namespace GameSettings 
     {
-        public class Setting
-        {
+        public class Setting {
             public string Name { get; set; }
         }
-        public class Setting<T> : Setting
-        {
+
+        public class Setting<T> : Setting {
             public T Value { get; set; }
-            private Setting(string name)
-            {
+            private Setting(string name) {
                 Name = name;
             }
-            public static Setting<T> Create(string name)
-            {
+
+            public static Setting<T> Create(string name) {
                 Setting<T> s = new (name);
                 Settings.AddSetting(s);
                 return s;
             }
-            public static Setting<T> Create(string name, T value)
-            {
+
+            public static Setting<T> Create(string name, T value) {
                 Setting<T> s = new(name);
                 s.Value = value;
                 Settings.AddSetting(s);
                 return s;
             }
-            public T Get()
-            {
+
+            public T Get() {
                 return Value;
             }
         }
 
-        public static class Settings
-        {
+        public static class Settings {
             public static GameProfile gameplay;
             public static VisualProfile visuals;
             public static ControlProfile controls;
             public static AudioProfile audio;
 
-            public static void Init()
-            {
+            public static void Init() {
                 InitAudio();
             }
 
             private readonly static System.Collections.Generic.List<Setting> settings = new ();
-            public static void AddSetting(Setting s)
-            {
+            public static void AddSetting(Setting s) {
                 settings.Add(s);
             }
 
-            public static Setting GetSetting(string code)
-            {
+            public static Setting GetSetting(string code) {
                 return settings.Find(s => s.Name == code);
             }
-            public static T Get<T>(Setting<T> s)
-            {
+
+            public static T Get<T>(Setting<T> s) {
                 return s.Value;
             }
-            private static T Get<T>(string code)
-            {
+
+            private static T Get<T>(string code) {
                 return Get<T>((Setting<T>)settings.Find(s => s.Name == code));
             }
 
-            public static void Set<T>(Setting<T> s, T value)
-            {
+            public static void Set<T>(Setting<T> s, T value) {
                 s.Value = value;
             }
-            private static void Set<T>(string code, T value)
-            {
+            private static void Set<T>(string code, T value) {
                 Set<T>((Setting<T>)settings.Find(s => s.Name == code), value);
             }
 
-            public static void InitControls()
-            {
+            public static void InitControls() {
                 Gameplay.Input.LoadJSON(controls.rebinds.Get());
             }
-            public static void InitVisuals()
-            {
+
+            public static void InitVisuals() {
                 Screen.SetResolution(Screen.width, Screen.height, (FullScreenMode)visuals.windowMode.Get(), visuals.refreshRate.Get());
                 Application.targetFrameRate = visuals.fpsLimit.Get();
                 QualitySettings.anisotropicFiltering = (AnisotropicFiltering)visuals.textureFiltering.Get();
@@ -87,28 +79,27 @@ namespace Core
 
                 Gameplay.Cam.active.UpdateSettings();
             }
-            public static void InitAudio()
-            {
+
+            public static void InitAudio() {
                 AudioListener.volume = audio.mainVolume.Get() / 100f;
-                Audio.audioMixer.SetFloat("DialogVol", Mathf.Log10(audio.dialogVolume.Get() / 100f) * 20);
-                Audio.audioMixer.SetFloat("IngameMusicVol", Mathf.Log10(audio.ingameMusicVolume.Get() / 100f) * 20);
-                Audio.audioMixer.SetFloat("MenuMusicVol", Mathf.Log10(audio.menuMusicVolume.Get() / 100f) * 20);
-                Audio.audioMixer.SetFloat("MenuSoundsVol", Mathf.Log10(audio.menuSoundsVolume.Get() / 100f) * 20);
+                Audio.mixer.SetFloat("DialogVol", Mathf.Log10(audio.dialogVolume.Get() / 100f) * 20);
+                Audio.mixer.SetFloat("IngameMusicVol", Mathf.Log10(audio.ingameMusicVolume.Get() / 100f) * 20);
+                Audio.mixer.SetFloat("MenuMusicVol", Mathf.Log10(audio.menuMusicVolume.Get() / 100f) * 20);
+                Audio.mixer.SetFloat("MenuSoundsVol", Mathf.Log10(audio.menuSoundsVolume.Get() / 100f) * 20);
             }
-            public static void InitFXAudioSettings()
-            {
-                Audio.audioMixer.SetFloat("FXVol", Mathf.Log10(audio.sfxVolume.Get() / 100f) * 20);
+
+            public static void InitFXAudioSettings() {
+                Audio.mixer.SetFloat("FXVol", Mathf.Log10(audio.sfxVolume.Get() / 100f) * 20);
             }
         }
 
-        public class GameProfile
-        {
+        public class GameProfile {
             public Setting<bool> showFPS = Setting<bool>.Create("show_fps", true);
             public Setting<int> language = Setting<int>.Create("language", 0);
             public Setting<bool> loadLastLOD = Setting<bool>.Create("load_last_lod", false);
         }
-        public class VisualProfile
-        {
+
+        public class VisualProfile {
             public Setting<int> fpsLimit = Setting<int>.Create("fps_limit", -1);
             public Setting<int> refreshRate = Setting<int>.Create("refresh_rate", 60);
             public Setting<int> vSync = Setting<int>.Create("v_sync");
@@ -132,23 +123,21 @@ namespace Core
             public Setting<int> ambientOcclusion = Setting<int>.Create("ambient_occlusion", 1);
             public Setting<int> postProcess = Setting<int>.Create("post_processing", 2);
 
-            public static bool operator ==(VisualProfile lhs, VisualProfile rhs)
-            {
+            public static bool operator ==(VisualProfile lhs, VisualProfile rhs) {
                 return lhs.Equals(rhs);
             }
-            public static bool operator !=(VisualProfile lhs, VisualProfile rhs)
-            {
+            public static bool operator !=(VisualProfile lhs, VisualProfile rhs) {
                 return !lhs.Equals(rhs);
             }
         }
-        public class ControlProfile
-        {
+
+        public class ControlProfile {
             public Setting<string> rebinds = Setting<string>.Create("rebinds");
             public Setting<float> verticalSensitivity = Setting<float>.Create("sensitivity_y", 1);
             public Setting<float> horizontalSensitivity = Setting<float>.Create("sensitivity_x", 1);
         }
-        public class AudioProfile
-        {
+
+        public class AudioProfile {
             public Setting<int> mainVolume = Setting<int>.Create("main_volume", 50);
             public Setting<int> sfxVolume = Setting<int>.Create("sfx_volume", 50);
             public Setting<int> dialogVolume = Setting<int>.Create("dialog_volume", 10);

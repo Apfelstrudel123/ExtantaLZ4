@@ -1,5 +1,4 @@
-﻿using Impact.Materials;
-using Impact.Objects;
+﻿using Impact.Objects;
 using UnityEditor;
 using UnityEngine;
 
@@ -21,8 +20,11 @@ namespace Impact.EditorScripts
             terrainProperty = serializedObject.FindProperty("_terrain");
             terrainMaterialsProperty = serializedObject.FindProperty("_terrainMaterials");
 
-            impactTerrain.SyncTerrainLayersAndMaterialsList();
-            terrainLayers = impactTerrain.TerrainData.terrainLayers;
+            if (impactTerrain.Terrain != null && impactTerrain.Terrain.terrainData != null)
+            {
+                impactTerrain.SyncTerrainLayersAndMaterialsList();
+                terrainLayers = impactTerrain.Terrain.terrainData.terrainLayers;
+            }
         }
 
         public override void OnInspectorGUI()
@@ -35,7 +37,7 @@ namespace Impact.EditorScripts
 
             EditorGUILayout.PropertyField(terrainProperty, new GUIContent("", "The Terrain this object is associated with."));
 
-            if (impactTerrain.Terrain == null)
+            if (impactTerrain.Terrain == null || impactTerrain.Terrain.terrainData == null)
             {
                 EditorGUILayout.HelpBox("Assign a Terrain to begin editing Terrain Materials.", MessageType.Info);
             }

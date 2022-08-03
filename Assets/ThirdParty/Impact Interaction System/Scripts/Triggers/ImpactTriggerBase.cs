@@ -202,7 +202,7 @@ namespace Impact.Triggers
                     for (int i = 0; i < count; i++)
                     {
                         ImpactMaterialComposition comp = ImpactManagerInstance.MaterialCompositionBuffer[i];
-                        if (comp.CompositionValue > 0)
+                        if (comp.CompositionValue > 0 && comp.Material != null)
                             buildInteractionData(myObject, collision, contactPoint, myVelocityData, otherVelocityData, comp.Material.MaterialTagsMask, comp.CompositionValue);
                     }
                 }

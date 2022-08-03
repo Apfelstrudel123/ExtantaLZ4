@@ -146,6 +146,8 @@ namespace Impact.EditorScripts
                     if (a != null)
                         impactAudioInteraction.CollisionAudioClips.Add(a);
                 }
+
+                EditorUtility.SetDirty(target);
             }
 
             EditorGUILayout.Separator();

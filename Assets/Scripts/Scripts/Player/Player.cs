@@ -21,15 +21,14 @@ namespace Gameplay
 	//
 	// Enum State
 	//
-	public enum ControlType
-	{
+	public enum ControlType {
 		Interact = 0,
 		SecInteract = 1,
 		Parkour = 2,
 		Individual = 3,
 	}
-	public enum PlayerDetectionType
-	{
+
+	public enum PlayerDetectionType {
 		PickUp
 	}
 
@@ -66,7 +65,7 @@ namespace Gameplay
 		{
 			active = this;
 
-			Audio.SetPlayerSources(fxAudio);
+			Audio.SetPlayerSources(fxAudio, ambientAudio);
 
 			Rigidbody = GetComponent<Rigidbody>();
 			health = GetComponent<ObjectHealth>();
@@ -80,7 +79,7 @@ namespace Gameplay
 			health.onDamage += TakeDamage;
 			cam.Init();
 			Movement.Init();
-            Weapons.Init(wpnLabel, wpnassetPath, weaponHolder, throwableSpawn);
+            Weapons.Init(wpnLabel, wpnassetPath, weaponHolder, gadgetSpawn);
             Inventory.Init(itemPath);
 		}
 		public void Setup()
@@ -175,7 +174,7 @@ namespace Gameplay
 
 		[Header("Gadget Settings")]
 		public float grenadeSpawnDelay = 0.35f;
-		[SerializeField] private Transform throwableSpawn;
+		public Transform gadgetSpawn;
 
 		#region Health
 
@@ -191,11 +190,12 @@ namespace Gameplay
 		{
 			if (Weapons.State != WeaponState.Reloading && Weapons.State != WeaponState.Aiming && Weapons.State != WeaponState.Throwing
 				&& Weapons.Target == Weapons.State && health.currentHealth < health.maxHealth && Game.PlayerStatus == PlayerStatus.Alive
-				&& Game.GameState == GameState.Active && State != PlayerLadder && !DebugConsole.instance.IsActive)
+				&& Game.GameState == GameState.Active && !DebugConsole.instance.IsActive) // TODO && State != PlayerLadder)
 			{
 				Heal();
 			}
 		}
+
 		public void Heal()
 		{
 			health.ResetHealth();
@@ -206,6 +206,7 @@ namespace Gameplay
 				Interact.RemoveControl(healControl);
 			}
 		}
+
 		public void TakeDamage(ObjectHealth.DamageType origin)
 		{
 			if (Game.PlayerStatus != PlayerStatus.Alive)
@@ -310,8 +311,7 @@ namespace Gameplay
 		public static void SetState(PlayerState newState, bool immediately)
 		{
 			float lastY = 0f;
-			if (State != null)
-			{
+			if (State != null) {
 				if (State == newState)
 					return;
 
@@ -320,21 +320,16 @@ namespace Gameplay
 				State.OnLeave();
 			}
 
-			active.stateData.TryGetValue(newState.ToString, out StateData);
+			// TODO active.stateData.TryGetValue(newState.ToString, out StateData);
 
 			if (Weapons.LightOn && !StateData.canTurnOnLight)
-			{
 				Weapons.SwitchLight();
-			}
 
 			if (!StateData.canLean && Movement.Lean != LeaningState.None)
-			{
-				Movement.SetLeaningState(LeaningState.None);
-			}
+				//TODO Movement.SetLeaningState(LeaningState.None);
 
-			if (immediately)
-			{
-				State = (PlayerState)System.Activator.CreateInstance(newState);
+			if (immediately) {
+				// TODO State = (PlayerState)System.Activator.CreateInstance(newState);
 				State.OnEnter();
 
 				Cam.Transform.position = Transform.position + StateData.camPosition;
@@ -347,10 +342,9 @@ namespace Gameplay
 
 				Transform.position = Transform.position + new Vector3(0f, -StateData.groundCheck.y + lastY, 0f);
 			}
-			else
-			{
+			else {
 				//yield return new WaitForSeconds(newState.time);
-				State = (PlayerState)System.Activator.CreateInstance(newState);
+				// TODO State = (PlayerState)System.Activator.CreateInstance(newState);
 				State.OnEnter();
 
 				Cam.Transform.position = Transform.position + StateData.camPosition;
@@ -364,8 +358,7 @@ namespace Gameplay
 				Transform.position = Transform.position + new Vector3(0f, -StateData.groundCheck.y + lastY, 0f);
 			}
 		}
-		public static void Reset(bool immediately)
-		{
+		public static void Reset(bool immediately) {
 			if (Weapons.LightOn) 
 				Weapons.SwitchLight();
 			Weapons.Reset();
@@ -374,9 +367,9 @@ namespace Gameplay
 			Cam.SetFoV(Settings.visuals.fov.Get(), true);
 		}
 
-		public void CompleteReset()
-		{
-			Destroy(weaponObj);
+		public void CompleteReset() {
+			// Destroy(weaponObj);
+			// Weapons.CompleteReset(); TODO
 			Reset(true);
 		}
 
@@ -441,7 +434,7 @@ namespace Gameplay
 				Interact.Update();
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward * Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.instance.speed);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.active.speed);
 
 				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 			}
@@ -458,9 +451,9 @@ namespace Gameplay
 					break;
 				case InputType.Jump:
 					Player.Rigidbody.velocity = Vector3.zero;
-					Vector3 v = Player.Transform.right * Input.Move.x * Player.instance.speed 
-						+ Player.Transform.forward * Input.Move.y * Player.instance.speed;
-					v.y = Player.instance.jumpHeight;
+					Vector3 v = Player.Transform.right * Input.Move.x * Player.active.speed 
+						+ Player.Transform.forward * Input.Move.y * Player.active.speed;
+					v.y = Player.active.jumpHeight;
 					Player.Rigidbody.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}
@@ -486,7 +479,7 @@ namespace Gameplay
 		public override void OnFixedUpdate()
 		{
 			Weapons.Update();
-			Player.Rigidbody.MovePosition(Player.Transform.position + new Vector3(Player.instance.vaultAngle.x, 0f, Player.instance.vaultAngle.z) * Time.fixedDeltaTime);
+			Player.Rigidbody.MovePosition(Player.Transform.position + new Vector3(Movement.vaultAngle.x, 0f, Movement.vaultAngle.z) * Time.fixedDeltaTime);
 		}
 
 		public override void OnLeave()
@@ -509,8 +502,8 @@ namespace Gameplay
 					break;
 				case InputType.Jump:
 					Player.Rigidbody.velocity = Vector3.zero;
-					Vector3 v = Player.Transform.right * Input.Move.x * Player.instance.speed +	Player.Transform.forward * Input.Move.y * Player.instance.runningSpeed;
-					v.y = Player.instance.jumpHeight;
+					Vector3 v = Player.Transform.right * Input.Move.x * Player.active.speed +	Player.Transform.forward * Input.Move.y * Player.active.runningSpeed;
+					v.y = Player.active.jumpHeight;
 					Player.Rigidbody.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}
@@ -542,7 +535,7 @@ namespace Gameplay
 				{
 					z /= add;
 				}*/
-				Vector3 v = (Player.Transform.right * x * Player.instance.speed + Player.Transform.forward * z * Player.instance.runningSpeed) * Time.fixedDeltaTime;
+				Vector3 v = (Player.Transform.right * x * Player.active.speed + Player.Transform.forward * z * Player.active.runningSpeed) * Time.fixedDeltaTime;
 
 				Player.Rigidbody.MovePosition(Player.Transform.position + v);
 
@@ -613,33 +606,26 @@ namespace Gameplay
 				Interact.Update();
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward * Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.instance.proneSpeed);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.active.proneSpeed);
 
 				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 			}
 		}
-		public override void GetInput(InputType inputType)
-		{
+		public override void GetInput(InputType inputType) {
 			switch (inputType)
 			{
-				case InputType.Crouch:
+				/*case InputType.Crouch:
 					if (Player.CanChangeState(typeof(PlayerCrouching), 0.55f))
-					{
 						Player.SetState(new PlayerCrouching(), false);
-					}
 					break;
 				case InputType.Prone:
 					if (Player.CanChangeState(typeof(PlayerStanding), 0.54f))
-					{
 						Player.SetState(new PlayerStanding(), false);
-					}
 					break;
 				case InputType.Jump:
 					if (Player.CanChangeState(typeof(PlayerStanding), 0.54f))
-					{
 						Player.SetState(new PlayerStanding(), false);
-					}
-					break;
+					break; TODO */
 			}
 		}
 		public override void OnLeave()
@@ -670,7 +656,7 @@ namespace Gameplay
 				Weapons.Update();
 				Vector3 v = (Player.Transform.right * Input.Move.x + Player.Transform.forward 
 					* Input.Move.y).normalized * Time.fixedDeltaTime;
-				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.instance.crouchSpeed);
+				Player.Rigidbody.MovePosition(Player.Transform.position + v * Player.active.crouchSpeed);
 
 				Player.Rigidbody.AddForce(Physics.gravity, ForceMode.Acceleration);
 			}
@@ -679,7 +665,7 @@ namespace Gameplay
 		{
 			switch (inputType)
 			{
-				case InputType.Crouch:
+				/* TODO case InputType.Crouch:
 					if (Player.CanChangeState(typeof(PlayerStanding), 0.54f))
 					{
 						Player.SetState(new PlayerStanding(), false);
@@ -696,7 +682,7 @@ namespace Gameplay
 					{
 						Player.SetState(new PlayerStanding(), false);
 					}
-					break;
+					break;*/
 			}
 		}
 		public override void OnLeave()
@@ -751,7 +737,7 @@ namespace Gameplay
 				case InputType.Jump:
 					Movement.ActiveHorse.rig.velocity = Vector3.zero;
 					Vector3 v = Movement.ActiveHorse.transform.right * Input.Move.x + 2f * Input.Move.y * Movement.ActiveHorse.transform.forward;
-					v.y = Player.instance.jumpHeight;
+					v.y = Player.active.jumpHeight;
 					Movement.ActiveHorse.rig.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}
@@ -777,7 +763,7 @@ namespace Gameplay
 				case InputType.Jump:
 					Movement.ActiveHorse.rig.velocity = Vector3.zero;
 					Vector3 v = 2f * Input.Move.x * Movement.ActiveHorse.transform.right + Movement.ActiveHorse.transform.forward * Input.Move.y * 6f;
-					v.y = Player.instance.jumpHeight;
+					v.y = Player.active.jumpHeight;
 					Movement.ActiveHorse.rig.AddForce(v, ForceMode.VelocityChange);
 					break;
 			}

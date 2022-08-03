@@ -60,12 +60,12 @@ namespace Impact.EditorScripts
             ImpactEditorUtilities.DrawToggleLeftProperty(emitOnSlideProperty, new GUIContent("Emit On Slide", "Should particles be emitted when sliding?"));
             ImpactEditorUtilities.DrawToggleLeftProperty(emitOnRollProperty, new GUIContent("Emit On Roll", "Should particles be emitted when rolling?"));
 
-            UnityEngine.GUI.enabled = !isParticleLoopedProperty.boolValue && (emitOnSlideProperty.boolValue || emitOnRollProperty.boolValue);
+            GUI.enabled = !isParticleLoopedProperty.boolValue && (emitOnSlideProperty.boolValue || emitOnRollProperty.boolValue);
 
             ImpactEditorUtilities.DrawPropertyWithWiderLabel(emissionIntervalProperty, new GUIContent("Emission Interval (Min/Max)", "The interval at which particles should be emitted when sliding or rolling."));
             ImpactEditorUtilities.DrawPropertyWithWiderLabel(emissionIntervalTypeProperty, new GUIContent("Interval Type", "Whether the Emission Interval is defined in Time (seconds) or Distance."));
 
-            UnityEngine.GUI.enabled = true;
+            GUI.enabled = true;
 
             serializedObject.ApplyModifiedProperties();
         }

@@ -1,12 +1,13 @@
 using UnityEngine;
+
 namespace Gameplay
 {
-	public class Molotov : MonoBehaviour
-	{
-		[SerializeField] private float explodeAfter = 5.0f;
+	public class Molotov : MonoBehaviour {
 
+		[SerializeField] private float explodeAfter = 5.0f;
 		[SerializeField] private float minimumForce = 1500.0f;
 		[SerializeField] private float maximumForce = 2500.0f;
+
 		private float throwForce;
 		private bool thrown;
 		private AudioSource impactSound = null;
@@ -16,14 +17,12 @@ namespace Gameplay
 		[SerializeField] private GameObject model;
 		[SerializeField] private ParticleSystem[] particles;
 
-		private void Awake()
-		{
+		private void Awake() {
 			impactSound = GetComponent<AudioSource>();
 			rig = GetComponent<Rigidbody>();
 		}
 
-		private void OnEnable()
-		{
+		private void OnEnable() {
 			rig.constraints = RigidbodyConstraints.FreezeAll;
 			rig.velocity = Vector3.zero;
 
@@ -33,24 +32,21 @@ namespace Gameplay
 			Invoke(nameof(Explode), explodeAfter);
 		}
 
-		public void Hide()
-		{
+		public void Hide() {
 			foreach (ParticleSystem p in particles)
 			{ p.Stop(); }
 			CancelInvoke();
 			gameObject.SetActive(false);
 		}
 
-		public void Throw()
-		{
+		public void Throw() {
 			thrown = true;
 			throwForce = Random.Range(minimumForce, maximumForce);
 			GetComponent<Rigidbody>().constraints = RigidbodyConstraints.None;
 			GetComponent<Rigidbody>().AddForce(Cam.active.transform.forward * throwForce);
 		}
 
-		private void Explode()
-		{
+		private void Explode() {
 			rig.constraints = RigidbodyConstraints.FreezeAll;
 			rig.velocity = Vector3.zero;
 
@@ -67,18 +63,14 @@ namespace Gameplay
 			Invoke(nameof(Hide), 2f);
 		}
 
-		private void Update()
-		{
-			if (!thrown)
-			{
-				transform.SetPositionAndRotation(Player.instance.grenadeSpawnPoint.position, Player.instance.grenadeSpawnPoint.rotation);
+		private void Update() {
+			if (!thrown) {
+				transform.SetPositionAndRotation(Player.active.gadgetSpawn.position, Player.active.gadgetSpawn.rotation);
 			}
 		}
 
-		private void OnCollisionEnter(Collision collision)
-		{
-			if (thrown && !exploded)
-			{
+		private void OnCollisionEnter(Collision collision) {
+			if (thrown && !exploded) {
 				Explode();
 			}
 		}

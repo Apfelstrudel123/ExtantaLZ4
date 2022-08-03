@@ -87,9 +87,9 @@ namespace Impact.EditorScripts
 
                     for (int i = 0; i < children.Length; i++)
                     {
-                        UnityEngine.GUI.enabled = false;
+                        GUI.enabled = false;
                         EditorGUILayout.ObjectField(children[i], typeof(ImpactObjectRigidbodyChild), true);
-                        UnityEngine.GUI.enabled = true;
+                        GUI.enabled = true;
                     }
 
                     GUILayout.Space(2);
@@ -121,9 +121,9 @@ namespace Impact.EditorScripts
 
             EditorGUILayout.Separator();
 
-            UnityEngine.GUI.enabled = false;
+            GUI.enabled = false;
             EditorGUILayout.ObjectField(new GUIContent("Parent"), parent, typeof(ImpactObjectRigidbody), true);
-            UnityEngine.GUI.enabled = true;
+            GUI.enabled = true;
 
             if (parent == null)
             {
